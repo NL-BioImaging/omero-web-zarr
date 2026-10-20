@@ -4,11 +4,11 @@ import sys
 from setuptools import setup, find_packages
 from setuptools.command.test import test as test_command
 
-VERSION = '0.1.2.dev0'
+VERSION = '0.1.2.dev0+nlbi.1'
 DESCRIPTION = "OMERO.web plugin for OME-Zarr"
 AUTHOR = "The Open Microscopy Team"
 LICENSE = "AGPL-3.0"
-HOMEPAGE = "https://github.com/ome/omero-web-zarr"
+HOMEPAGE = "https://github.com/NL-BioImaging/omero-web-zarr"
 
 
 class PyTest(test_command):
@@ -95,7 +95,7 @@ setup(
     download_url='%s/archive/v%s.tar.gz' % (HOMEPAGE, VERSION),  # NOQA
     packages=find_packages(),
     keywords=['omero', 'zarr', 'ome', 'web'],
-    install_requires=['zarr'],
+    install_requires=['zarr', 'numpy', 'numcodecs', 'requests'],
     include_package_data=True,
     zip_safe=False,
     cmdclass={'test': PyTest},

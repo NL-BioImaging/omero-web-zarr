@@ -1,5 +1,5 @@
-.. image:: https://github.com/ome/omero-web-zarr/workflows/OMERO/badge.svg
-    :target: https://github.com/ome/omero-web-zarr/actions
+.. image:: https://github.com/NL-BioImaging/omero-web-zarr/actions/workflows/provider.yml/badge.svg
+    :target: https://github.com/NL-BioImaging/omero-web-zarr/actions/workflows/provider.yml
 
 .. image:: https://badge.fury.io/py/omero-web-zarr.svg
     :target: https://badge.fury.io/py/omero-web-zarr
@@ -8,6 +8,82 @@ omero-web-zarr
 ==============
 
 OMERO.web plugin for OME-Zarr.
+
+NL-BioImaging performance fork
+-----------------------------
+
+This fork of `ome/omero-web-zarr <https://github.com/ome/omero-web-zarr>`_
+starts from upstream commit ``4e1e685dff22136abfd2626f6fd6eaf985aba368``.
+Its Python version is ``0.1.2.dev0+nlbi.1``; it is installed from a pinned
+Git commit, not published as an upstream or PyPI release.
+It serves ordinary OMERO images through authenticated virtual OME-Zarr HTTP
+endpoints. No BIOMERO, Slurm, Analysis or exported Zarr store is required.
+It produces OME-NGFF 0.3/0.4 with Zarr v2 arrays, not OME-Zarr 0.5.
+The separate `BIOMERO.ZarrViewer <https://github.com/NL-BioImaging/BIOMERO.ZarrViewer>`_
+can also read physical OME-Zarr 0.4/0.5 stores without this optional provider.
+
+Changes relative to upstream
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Build array metadata directly and encode lossless Zstd level-1 chunks in
+  memory, eliminating temporary Zarr directories and file reads. All-zero
+  chunks remain valid encoded chunks.
+* Read tiles up to 1024 by 1024 pixels and group up to eight Z planes per
+  chunk, with a 2 MiB target. T and C chunks remain one. Partial edge chunks
+  are zero padded, and singleton axes retain upstream conventions.
+* Use one RawPixelsStore per chunk, select the actual native pyramid
+  resolution, convert network byte order to the declared dtype, and always
+  close pixel readers and metadata rendering engines.
+* Expose ``CHUNK_METADATA_API=1`` for trusted in-process callers that already
+  checked image permissions and metadata. Ordinary HTTP routes still resolve
+  image access themselves. ``OPTIMIZED_LAYOUT=v2-z8-1024`` identifies the chunk
+  addressing scheme; consumers must invalidate cached metadata when it changes.
+
+The viewer's progress bar, browser caches, deferred contrast statistics and
+non-binary pyramid display fixes live in ZarrViewer, not in this provider.
+This fork remains an experimental HTTP provider under the upstream AGPL license.
+
+Installation with ZarrViewer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Use the viewer's `optional Docker installation recipe
+<https://github.com/NL-BioImaging/BIOMERO.ZarrViewer/blob/0.8.1-beta-standalone/docs/http-zarr.md>`_
+with ``ENABLE_HTTP_ZARR=true``. It pins this fork's commit and archive checksum.
+For another OMERO.web environment, install a reviewed full commit::
+
+    pip install "omero-web-zarr @ git+https://github.com/NL-BioImaging/omero-web-zarr.git@<full-commit>"
+    omero config append omero.web.apps '"omero_web_zarr"'
+
+To enable ZarrViewer's optional integration, also set::
+
+    omero config set omero.web.zarr_viewer.omero_web_zarr_enabled true
+
+Restart OMERO.web after changing its installed apps. Keep source data and the
+OMERO database unchanged; the provider reads existing OMERO-managed pixels.
+
+Validation and performance
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``test/check_provider.py`` exercises the installed functions with deterministic
+pixel readers: black data, uint16 byte order, grouped T/C/Z, padded edges and
+native pyramid resolutions. It compares every decoded pixel and verifies
+reader closure. The Provider regression workflow runs this against OMERO.web
+5.33.2 and Zarr-Python 3.4.1. This is a codec/reader regression check, not a live
+server integration test. Upstream's OMERO infrastructure workflow is retained
+for the upstream repository; this fork does not publish packages to PyPI.
+
+Separately, local Docker validation on 20 October 2026 used OMERO.server
+5.6.18 and OMERO.web 5.33.2 without BIOMERO. An Aperio CMU-1.svs image
+(46000 x 32914 RGB; 0.499 micrometre pixels) rendered at overview and native
+resolution. A calibrated confocal RGB stack (370 x 370 x 36 Z) produced an
+exact maximum projection matching the source pixel hash. Its grouped layout
+required 15 pixel HTTP requests instead of the previous 108; one local run
+downloaded those chunks in approximately one second. These are local pixel
+transfer measurements, not portable end-to-end loading benchmarks.
+Physical OME-Zarr 0.4/0.5 regression reads in ZarrViewer also matched all pixels.
+
+Upstream documentation
+----------------------
 
 Implementation of `OME-NGFF <https://ngff.openmicroscopy.org/latest/>`_ API with an omero-web app.
 

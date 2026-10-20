@@ -18,6 +18,9 @@ on:
 
 jobs:
   test:
+    # Upstream infrastructure is retained for upstream; this fork uses provider.yml
+    # and separately documents live standalone OMERO validation.
+    if: github.repository == 'ome/omero-web-zarr'
     name: Run integration tests against OMERO
     runs-on: ubuntu-latest
     env:

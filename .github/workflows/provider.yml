@@ -1,0 +1,14 @@
+name: Provider regression
+on: [push, pull_request]
+jobs:
+  pixels:
+    runs-on: ubuntu-latest
+    container:
+      image: openmicroscopy/omero-web-standalone:5.33.2@sha256:0ed9880841da97b06db1268d6f28e4bc52dbc25f6217a32eee622e7403f9503b
+      options: --user root
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install provider and pinned pixel test dependencies
+        run: /opt/omero/web/venv3/bin/python -m pip install --no-build-isolation . 'numpy==2.4.6' 'numcodecs==0.17.0' 'zarr==3.4.1'
+      - name: Check decoded pixels and reader cleanup
+        run: /opt/omero/web/venv3/bin/python test/check_provider.py
