@@ -46,9 +46,24 @@ This fork remains an experimental HTTP provider under the upstream AGPL license.
 Installation with ZarrViewer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Use the viewer's `optional Docker installation recipe
-<https://github.com/NL-BioImaging/BIOMERO.ZarrViewer/blob/0.8.1-beta-standalone/docs/http-zarr.md>`_
-with ``ENABLE_HTTP_ZARR=true``. It pins this fork's commit and archive checksum.
+Choose the Docker recipe for your deployment:
+
+* **Standalone OMERO, without BIOMERO:** use the `standalone installation guide
+  <https://github.com/NL-BioImaging/BIOMERO.ZarrViewer/blob/0.8.1-beta-standalone/docs/http-zarr.md#reproduce-the-standalone-docker-installation>`_
+  and `Dockerfile.standalone
+  <https://github.com/NL-BioImaging/BIOMERO.ZarrViewer/blob/0.8.1-beta-standalone/docker/Dockerfile.standalone>`_.
+* **Existing BIOMERO stack:** use the `BIOMERO installation guide
+  <https://github.com/NL-BioImaging/BIOMERO.ZarrViewer/blob/0.8.1-beta-standalone/docs/deployment-nl-biomero.md#optional-pinned-http-zarr-provider-in-an-existing-biomero-stack>`_
+  and `Dockerfile.biomero
+  <https://github.com/NL-BioImaging/BIOMERO.ZarrViewer/blob/0.8.1-beta-standalone/docker/Dockerfile.biomero>`_.
+  This extends your combined web image, preserving BIOMERO, Analysis,
+  WorkflowSkills, the installed viewer and existing storage configuration.
+
+Both recipes install this optional provider with ``ENABLE_HTTP_ZARR=true``
+and pin its commit and archive checksum. The guides cover build, configuration
+and deployment checks. Leaving the option false in the BIOMERO recipe keeps
+any provider inherited from the base image unchanged.
+
 For another OMERO.web environment, install a reviewed full commit::
 
     pip install "omero-web-zarr @ git+https://github.com/NL-BioImaging/omero-web-zarr.git@<full-commit>"
