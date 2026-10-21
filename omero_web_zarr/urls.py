@@ -21,6 +21,13 @@ from . import views
 
 urlpatterns = [
 
+    re_path(r'^v0\.5/image/(?P<iid>[0-9]+)\.zarr/zarr\.json$',
+            views.image_zarr_json, name='zarr_image_v3_group'),
+    re_path(r'^v0\.5/image/(?P<iid>[0-9]+)\.zarr/(?P<level>[0-9]+)/zarr\.json$',
+            views.image_zarr_json, name='zarr_image_v3_array'),
+    re_path(r'^v(?P<version>0\.5)/image/(?P<iid>[0-9]+)\.zarr/(?P<level>[0-9]+)/c/(?P<chunk>[0-9/]+)$',
+            views.image_chunk, name='zarr_image_v3_chunk'),
+
     # index 'home page' of the app
     re_path(r'^$', views.index, name="omero_web_zarr_index"),
 

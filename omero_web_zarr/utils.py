@@ -48,7 +48,7 @@ def marshal_axes_v3(image):
     dims = ['t', 'c', 'z', 'y', 'x']
     axes = []
     for dim in dims:
-        if getattr(image, 'getSize' + dim.upper())() > 1:
+        if getattr(image, 'getSize' + dim.upper())() > 1 or dim in ('y', 'x'):
             axes.append(dim)
     return axes
 

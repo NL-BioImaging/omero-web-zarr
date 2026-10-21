@@ -14,11 +14,12 @@ NL-BioImaging performance fork
 
 This fork of `ome/omero-web-zarr <https://github.com/ome/omero-web-zarr>`_
 starts from upstream commit ``4e1e685dff22136abfd2626f6fd6eaf985aba368``.
-Its Python version is ``0.1.2.dev0+nlbi.1``; it is installed from a pinned
+Its Python version is ``0.1.2.dev0+nlbi.2``; it is installed from a pinned
 Git commit, not published as an upstream or PyPI release.
 It serves ordinary OMERO images through authenticated virtual OME-Zarr HTTP
 endpoints. No BIOMERO, Slurm, Analysis or exported Zarr store is required.
-It produces OME-NGFF 0.3/0.4 with Zarr v2 arrays, not OME-Zarr 0.5.
+It produces OME-NGFF 0.3/0.4 with Zarr v2 arrays and optionally OME-Zarr 0.5
+with unsharded Zarr v3 arrays, using separate versioned routes.
 The separate `BIOMERO.ZarrViewer <https://github.com/NL-BioImaging/BIOMERO.ZarrViewer>`_
 can also read physical OME-Zarr 0.4/0.5 stores without this optional provider.
 
@@ -42,6 +43,32 @@ Changes relative to upstream
 The viewer's progress bar, browser caches, deferred contrast statistics and
 non-binary pyramid display fixes live in ZarrViewer, not in this provider.
 This fork remains an experimental HTTP provider under the upstream AGPL license.
+
+Optional OME-Zarr 0.5
+~~~~~~~~~~~~~~~~~~~~~
+
+The existing 0.3/0.4 routes retain their Zarr v2 layout. Clients can explicitly
+select the additional 0.5 representation::
+
+    /zarr/v0.5/image/[ID].zarr/zarr.json
+    /zarr/v0.5/image/[ID].zarr/0/zarr.json
+    /zarr/v0.5/image/[ID].zarr/0/c/[chunk-coordinates]
+
+The group metadata uses ``attributes.ome.version=0.5``. Arrays include named
+dimensions, a regular chunk grid, little-endian bytes and lossless Zstd level 1
+without a checksum. There is no sharding. Pixel access, chunk shapes and native
+pyramid levels are shared with 0.4; a format switch alone promises no speedup.
+Physical XYZ calibration is included in the 0.5 scale transformations.
+Image permissions apply to every 0.5 metadata and chunk route.
+
+ZarrViewer keeps HTTP NGFF 0.4 as its default. With a compatible viewer/provider
+and Zarr-Python 3, explicitly select the optional format with::
+
+    omero config set omero.web.zarr_viewer.http_ngff_version 0.5
+
+Restart OMERO.web to apply this setting. Set it back to ``0.4`` to restore
+the default representation. This setting affects ordinary virtual HTTP images;
+physical OME-Zarr 0.4/0.5 and BIOMERO registrations retain their existing paths.
 
 Installation with ZarrViewer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

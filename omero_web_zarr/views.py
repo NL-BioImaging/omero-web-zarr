@@ -51,6 +51,7 @@ PIXEL_TYPES = {
 # Derived performance variant of the pinned upstream views; see docker/provider-README.md.
 CHUNK_METADATA_API = 1
 OPTIMIZED_LAYOUT = 'v2-z8-1024'
+SUPPORTED_NGFF_VERSIONS = ('0.3', '0.4', '0.5')
 
 @contextmanager
 def _read_image(conn, iid, supplied=None):
@@ -72,6 +73,33 @@ def _array_metadata(image, level):
             'dtype': np.dtype(PIXEL_TYPES[image.getPrimaryPixels().getPixelsType().getValue()]).str,
             'compressor': numcodecs.Zstd(level=1).get_config(),
             'fill_value': 0, 'order': 'C', 'filters': None, 'dimension_separator': '/'}
+
+
+def _v3_metadata(image, level):
+    meta = _array_metadata(image, level)
+    return {'zarr_format': 3, 'node_type': 'array', 'shape': meta['shape'],
+            'data_type': np.dtype(meta['dtype']).name,
+            'chunk_grid': {'name': 'regular', 'configuration': {'chunk_shape': meta['chunks']}},
+            'chunk_key_encoding': {'name': 'default', 'configuration': {'separator': '/'}},
+            'fill_value': 0, 'dimension_names': marshal_axes_v3(image),
+            'codecs': [{'name': 'bytes', 'configuration': {'endian': 'little'}},
+                       {'name': 'zstd', 'configuration': {'level': 1, 'checksum': False}}],
+            'attributes': {}}
+
+
+def _chunk_metadata(meta):
+    """Normalize the supported unsharded v3 layout for the shared pixel reader."""
+    if meta.get('zarr_format') != 3:
+        return meta
+    if meta.get('codecs') != [
+        {'name': 'bytes', 'configuration': {'endian': 'little'}},
+        {'name': 'zstd', 'configuration': {'level': 1, 'checksum': False}},
+    ]:
+        raise Http404('Unsupported virtual Zarr codec chain')
+    return {'shape': meta['shape'],
+            'chunks': meta['chunk_grid']['configuration']['chunk_shape'],
+            'dtype': np.dtype(meta['data_type']).newbyteorder('<').str,
+            'compressor': numcodecs.Zstd(level=1, checksum=False).get_config()}
 
 
 
@@ -137,11 +165,40 @@ def image_zgroup(request, **kwargs):
     return JsonResponse({"zarr_format": 2})
 
 
+@login_required()
+def image_zarr_json(request, iid, conn=None, level=None, **kwargs):
+    """Optional NGFF 0.5 / Zarr v3 view; no shards or pixel export."""
+    import inspect
+    with _read_image(conn, iid, kwargs.get('_image')) as image:
+        if level is not None:
+            return JsonResponse(_v3_metadata(image, int(level)))
+        # Share the existing channel, pyramid and axis metadata implementation.
+        result = inspect.unwrap(image_zattrs)(request, iid=iid, version='0.4',
+                                             conn=conn, _image=image)
+        attrs = json.loads(result.content)
+        for multiscale in attrs['multiscales']:
+            multiscale.pop('version', None)
+            for dataset in multiscale['datasets']:
+                shape = get_image_shape(image, int(dataset['path']))
+                scale = []
+                for axis, size in zip(multiscale['axes'], shape):
+                    name = axis['name']
+                    value = getattr(image, 'getSize'+name.upper())() / size
+                    if name in 'xyz':
+                        physical = getattr(image, 'getPixelSize'+name.upper())(units=True)
+                        if physical is not None:
+                            value *= physical.getValue()
+                    scale.append(value)
+                dataset['coordinateTransformations'] = [{'type': 'scale', 'scale': scale}]
+        return JsonResponse({'zarr_format': 3, 'node_type': 'group',
+                             'attributes': {'ome': {'version': '0.5', **attrs}}})
+
+
 def get_image_shape(image, level):
 
     shapes = get_image_shapes(image)
-    if level >= len(shapes):
-        raise Exception(
+    if level < 0 or level >= len(shapes):
+        raise Http404(
             "Level %s higher than %s levels for this image" %
             (level, len(shapes)))
     return shapes[level]
@@ -150,7 +207,7 @@ def get_image_shape(image, level):
 def get_image_shapes(image):
 
     shape = [getattr(image, 'getSize' + dim)() for dim in ('TCZYX')]
-    base_shape = [size for size in shape if size > 1]
+    base_shape = [size for dim, size in zip('TCZYX', shape) if size > 1 or dim in 'YX']
     # For down-sampled levels of pyramid, get shape
     shapes = [base_shape]
     if image.requiresPixelsPyramid():
@@ -186,12 +243,17 @@ def image_zarray(request, iid, level, conn=None, **kwargs):
 
 @login_required()
 def image_chunk(request, iid, level, chunk, conn=None,
-                array_metadata=None, resolution_level=None, **kwargs):
+                array_metadata=None, resolution_level=None, version='0.4', **kwargs):
     with _read_image(conn, iid, kwargs.get('_image')) as image:
         level = int(level)
-        axes = marshal_axes_v3(image)
+        axes = [axis for axis in 'tczyx' if getattr(image, 'getSize'+axis.upper())() > 1 or axis in 'yx']
+        import re
+        if not re.fullmatch(r'\d+(?:/\d+)*', chunk):
+            raise Http404('Invalid chunk coordinates')
         dims = [int(dim) for dim in chunk.split('/')]
-        meta = array_metadata if array_metadata is not None else _array_metadata(image, level)
+        meta = array_metadata if array_metadata is not None else (
+            _v3_metadata(image, level) if version == '0.5' else _array_metadata(image, level))
+        meta = _chunk_metadata(meta)
         shape, chunks = meta['shape'], meta['chunks']
         if len(dims) != len(axes) or any(i < 0 or i * c >= n for i, c, n in zip(dims, chunks, shape)):
             raise Http404('Chunk is outside the image')
