@@ -124,6 +124,13 @@ downloaded those chunks in approximately one second. These are local pixel
 transfer measurements, not portable end-to-end loading benchmarks.
 Physical OME-Zarr 0.4/0.5 regression reads in ZarrViewer also matched all pixels.
 
+The `standalone 0.4 versus 0.5 comparison
+<https://github.com/NL-BioImaging/BIOMERO.ZarrViewer/blob/0.8.1-beta-standalone/docs/http-zarr.md#standalone-comparison-of-virtual-04-and-05>`_
+records the 21 October 2026 measurements and raw trials. SVS overview/native
+pixels and the complete confocal MIP matched exactly, with the same request
+counts, chunk shapes and compressed pixel byte counts. Pixel-transfer medians
+were close; these results do not establish a large format-related speedup.
+
 Upstream documentation
 ----------------------
 
